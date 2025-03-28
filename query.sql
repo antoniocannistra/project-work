@@ -84,7 +84,7 @@ SELECT
     COALESCE(p.p_iva,p.cf, 'NESSUN DATO') AS "codice di riconoscimento"
 FROM passeggero p;
 
---creazione vista materializzata per le tratte giornaliere (inserisci stessa tratta con cambio però)
+--creazione vista materializzata per le tratte giornaliere 
 
 CREATE MATERIALIZED VIEW tratte_giornaliere AS
 select
