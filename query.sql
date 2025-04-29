@@ -1,4 +1,4 @@
---Verifica il numero di posti rimanenti per una determinata tratta
+--Verifica il numero di posti rimanenti per una determinata tratta (SISTEMATO)
 SELECT
     t.id_tratta,
     s1.nome "Stazione di partenza",
@@ -13,55 +13,61 @@ FROM effettua e
          JOIN stazione s1 ON t.id_stazione_partenza = s1.id_stazione
          JOIN stazione s2 ON t.id_stazione_arrivo = s2.id_stazione
          JOIN treno tr ON e.id_treno = tr.matricola
-         JOIN prezzo p ON p.id_tratta = t.id_tratta
-         JOIN biglietto b ON b.id_prezzo = p.id_prezzo AND b.data_annullamento IS NULL
-WHERE s1.nome = 'Napoli Centrale' AND s2.nome = 'Milano Centrale'  AND e.partenza_prevista = '2025-03-19 23:59:04.000000'
+         JOIN biglietto b ON b.id_tratta = t.id_tratta AND b.data_annullamento IS NULL
+WHERE s1.nome = 'Milazzo Centrale' AND s2.nome = 'Messina Centrale'  AND e.partenza_prevista = '2025-04-28 17:32:51.000000'
 GROUP BY t.id_tratta, s1.nome, s2.nome, tr.numero_posti, e.partenza_prevista,tr.matricola;
 
---Verifica i cambi di una determinata tratta
+--Verifica le fermate di una determinata tratta (SISTEMATO)
 SELECT
     t.id_tratta,
-    s1.nome "Stazione di entrata cambio",
-    s2.nome "Stazione di uscita cambio",
-    TO_CHAR(c.partenza_prevista,'DD/MM/YYYY HH24:MI') "Partenza prevista",
-    TO_CHAR(c.partenza_effettiva,'DD/MM/YYYY HH24:MI') "Partenza effettiva"
+    s.nome "Fermate",
+    TO_CHAR(f.partenza_prevista,'DD/MM/YYYY HH24:MI') "Partenza prevista",
+    TO_CHAR(f.partenza_effettiva,'DD/MM/YYYY HH24:MI') "Partenza effettiva"
 FROM tratta t
-         JOIN cambio c ON t.id_tratta = c.id_tratta
-         JOIN stazione s1 ON c.s_entrata = s1.id_stazione
-         JOIN stazione s2 ON c.s_uscita = s2.id_stazione
-         JOIN stazione s3 ON t.id_stazione_partenza = s3.id_stazione
-         JOIN stazione s4 ON t.id_stazione_arrivo = s4.id_stazione
-WHERE s3.nome = 'Napoli Centrale' AND s4.nome = 'Milano Centrale';
-
---Visualizza tutti i biglietti acquistati da un determinato passeggero
-SELECT
-   s1.nome "Stazione di partenza", s2.nome "Stazione di arrivo", TO_CHAR(b.data_emissione, 'DD/MM/YYYY HH24:MI') "Data emissione", p.prezzo, tb.descrizione
-FROM passeggero pass
-    JOIN biglietto b ON b.id_passeggero = pass.id_passeggero
-    JOIN prezzo p ON b.id_prezzo = p.id_prezzo
-    JOIN tipologia_biglietto tb ON tb.id_tipologia = p.id_tipologia_biglietto
-    JOIN tratta t ON p.id_tratta = t.id_tratta
-    JOIN stazione s1 ON s1.id_stazione = t.id_stazione_partenza
-    JOIN stazione s2 ON s2.id_stazione = t.id_stazione_arrivo
+         JOIN fermate f ON t.id_tratta = f.id_tratta
+         JOIN stazione s ON f.id_stazione = s.id_stazione
+         JOIN stazione s_tratta_partenza ON s_tratta_partenza.id_stazione = t.id_stazione_partenza
+         JOIN stazione s_tratta_arrivo ON s_tratta_arrivo.id_stazione = t.id_stazione_arrivo
 WHERE
-    --pass.id_passeggero = 1
-    pass.nome = 'Antonio' AND pass.cognome = 'Cannistrà'
-ORDER BY  p.prezzo;
+        s_tratta_partenza.nome = 'Napoli Centrale' AND s_tratta_arrivo.nome = 'Milano Centrale';
+        --t.id_tratta = 1;
 
---Verifica validità di tutti i biglietti relativi ad una tratta comprensivi di nominativo
-SELECT
-    pass.nome, pass.cognome, b.data_validazione "Validato"
+
+--Visualizza tutti i biglietti acquistati da un determinato passeggero (SISTEMATA)
+SELECT p.id_prenotazione, TO_CHAR(b.data_emissione, 'DD/MM/YYYY HH24:MI') AS "Data emissione",
+       tb.descrizione AS "Tipologia Biglietto", s_partenza.nome AS "Stazione di partenza",
+       s_arrivo.nome AS "Stazione di arrivo", b.prezzo AS "Prezzo"
 FROM biglietto b
-    JOIN passeggero pass ON pass.id_passeggero = b.id_passeggero
-    JOIN prezzo p ON b.id_prezzo = p.id_prezzo
-    JOIN tratta t ON p.id_tratta = t.id_tratta
-    JOIN stazione s1 ON s1.id_stazione = t.id_stazione_partenza
-    JOIN stazione s2 ON s2.id_stazione = t.id_stazione_arrivo
-    JOIN effettua e ON t.id_tratta = e.id_tratta
+         JOIN prenotazione p on b.id_prenotazione = p.id_prenotazione
+         JOIN tratta t ON b.id_tratta = t.id_tratta
+         JOIN stazione s_partenza ON t.id_stazione_partenza = s_partenza.id_stazione
+         JOIN stazione s_arrivo ON t.id_stazione_arrivo = s_arrivo.id_stazione
+         JOIN passeggero pass ON p.id_passeggero = pass.id_passeggero
+         JOIN tipologia_biglietto tb ON b.id_tipologia = tb.id_tipologia
 WHERE
-    s1.nome = 'Napoli Centrale' AND s2.nome = 'Milano Centrale' AND e.partenza_prevista = '2025-03-19 23:59:04.000000';
+  --pass.id_passeggero = 1
+    pass.nome = 'Antonio' AND pass.cognome = 'Cannistrà'
+ORDER BY p.prezzo_totale;
 
---Visualizza il numero di minuti di ritardo di uno specifico treno in partenza
+-- Verifica validità di tutti i biglietti relativi a una tratta comprensivi di nominativo (SISTEMATO)
+SELECT
+    pass.nome,
+    pass.cognome,
+    b.data_validazione AS "Validato"
+FROM
+    prenotazione p
+        JOIN passeggero pass ON pass.id_passeggero = p.id_passeggero
+        JOIN biglietto b ON b.id_prenotazione = p.id_prenotazione
+        JOIN tratta t ON b.id_tratta = t.id_tratta
+        JOIN stazione s1 ON s1.id_stazione = t.id_stazione_partenza
+        JOIN stazione s2 ON s2.id_stazione = t.id_stazione_arrivo
+        JOIN effettua e ON t.id_tratta = e.id_tratta
+WHERE
+    s1.nome = 'Milazzo Centrale'
+  AND s2.nome = 'Messina Centrale'
+  AND e.partenza_prevista = '2025-04-28 17:32:51.000000';
+
+--Visualizza il numero di minuti di ritardo di uno specifico treno in partenza (SISTEMATO)
 SELECT
     e.partenza_prevista,
     e.partenza_effettiva,
@@ -71,9 +77,9 @@ FROM effettua e
          JOIN stazione s1 ON s1.id_stazione = t.id_stazione_partenza
          JOIN stazione s2 ON s2.id_stazione = t.id_stazione_arrivo
 WHERE
-    s1.nome = 'Napoli Centrale'
-    AND s2.nome = 'Milano Centrale'
-    AND e.partenza_prevista = '2025-03-19 23:59:04.000000';
+    s1.nome = 'Milazzo Centrale'
+    AND s2.nome = 'Messina Centrale'
+    AND e.partenza_prevista = '2025-04-28 17:32:51.000000';
 
 --Visualizza i recapiti di tutti i clienti con i relativi dati anagrafici, se non c’è la partita iva, visualizzare il codice fiscale
 SELECT
@@ -83,7 +89,7 @@ SELECT
     COALESCE(p.p_iva,p.cf, 'NESSUN DATO') AS "codice di riconoscimento"
 FROM passeggero p;
 
---creazione vista materializzata per le tratte giornaliere (inserisci stessa tratta con cambio però)
+--creazione vista materializzata per le tratte giornaliere
 
 CREATE MATERIALIZED VIEW tratte_giornaliere AS
 select
@@ -98,3 +104,4 @@ FROM effettua e
     JOIN stazione s1 ON s1.id_stazione = t.id_stazione_partenza
     JOIN stazione s2 ON s2.id_stazione = t.id_stazione_arrivo
 WHERE DATE(e.partenza_prevista ) = CURRENT_DATE;
+
