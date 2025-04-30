@@ -105,3 +105,44 @@ FROM effettua e
     JOIN stazione s2 ON s2.id_stazione = t.id_stazione_arrivo
 WHERE DATE(e.partenza_prevista ) = CURRENT_DATE;
 
+
+-- TRIGGER
+
+CREATE OR REPLACE FUNCTION aggiorna_stato_prenotazione_in_confermata()
+    RETURNS trigger AS $$
+BEGIN
+    -- Se lo stato è ancora "in attesa" e viene inserito un metodo di pagamento, cambia il valore in "confermata"
+    IF NEW.stato = 'IN_ATTESA' AND NEW.id_metodo_pagamento IS NOT NULL THEN
+        NEW.stato := 'CONFERMATA';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+
+CREATE TRIGGER trigger_stato_confermata
+    BEFORE UPDATE ON prenotazione
+    FOR EACH ROW
+EXECUTE FUNCTION aggiorna_stato_prenotazione_in_confermata();
+
+CREATE OR REPLACE FUNCTION aggiorna_prezzo_totale()
+    RETURNS TRIGGER AS $$
+BEGIN
+    UPDATE prenotazione
+    SET prezzo_totale = (
+        SELECT COALESCE(SUM(prezzo), 0)
+        FROM biglietto
+        WHERE id_prenotazione = NEW.id_prenotazione
+          AND data_annullamento IS NULL
+    )
+    WHERE id_prenotazione = NEW.id_prenotazione;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+
+CREATE TRIGGER trigger_aggiorna_prezzo_totale
+    AFTER INSERT OR UPDATE OR DELETE ON biglietto
+    FOR EACH ROW
+EXECUTE FUNCTION aggiorna_prezzo_totale();
