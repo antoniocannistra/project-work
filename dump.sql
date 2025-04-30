@@ -5,7 +5,7 @@
 -- Dumped from database version 17.4 (Postgres.app)
 -- Dumped by pg_dump version 17.0
 
--- Started on 2025-04-29 11:52:50 CEST
+-- Started on 2025-04-30 10:36:46 CEST
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -20,7 +20,7 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 --
--- TOC entry 3791 (class 1262 OID 16390)
+-- TOC entry 3796 (class 1262 OID 16390)
 -- Name: trasporti; Type: DATABASE; Schema: -; Owner: postgres
 --
 
@@ -44,26 +44,7 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 --
--- TOC entry 4 (class 2615 OID 2200)
--- Name: public; Type: SCHEMA; Schema: -; Owner: pg_database_owner
---
-
-CREATE SCHEMA public;
-
-
-ALTER SCHEMA public OWNER TO pg_database_owner;
-
---
--- TOC entry 3792 (class 0 OID 0)
--- Dependencies: 4
--- Name: SCHEMA public; Type: COMMENT; Schema: -; Owner: pg_database_owner
---
-
-COMMENT ON SCHEMA public IS 'standard public schema';
-
-
---
--- TOC entry 874 (class 1247 OID 16455)
+-- TOC entry 876 (class 1247 OID 16455)
 -- Name: classe_treno; Type: TYPE; Schema: public; Owner: antoniocannistra
 --
 
@@ -77,7 +58,7 @@ CREATE TYPE public.classe_treno AS ENUM (
 ALTER TYPE public.classe_treno OWNER TO antoniocannistra;
 
 --
--- TOC entry 895 (class 1247 OID 24610)
+-- TOC entry 897 (class 1247 OID 24610)
 -- Name: stato_prenotazione; Type: TYPE; Schema: public; Owner: antoniocannistra
 --
 
@@ -91,6 +72,51 @@ CREATE TYPE public.stato_prenotazione AS ENUM (
 
 
 ALTER TYPE public.stato_prenotazione OWNER TO antoniocannistra;
+
+--
+-- TOC entry 238 (class 1255 OID 24722)
+-- Name: aggiorna_prezzo_totale(); Type: FUNCTION; Schema: public; Owner: antoniocannistra
+--
+
+CREATE FUNCTION public.aggiorna_prezzo_totale() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    UPDATE prenotazione
+    SET prezzo_totale = (
+        SELECT COALESCE(SUM(prezzo), 0)
+        FROM biglietto
+        WHERE id_prenotazione = NEW.id_prenotazione
+          AND data_annullamento IS NULL
+    )
+    WHERE id_prenotazione = NEW.id_prenotazione;
+
+    RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION public.aggiorna_prezzo_totale() OWNER TO antoniocannistra;
+
+--
+-- TOC entry 237 (class 1255 OID 24720)
+-- Name: aggiorna_stato_prenotazione_in_confermata(); Type: FUNCTION; Schema: public; Owner: antoniocannistra
+--
+
+CREATE FUNCTION public.aggiorna_stato_prenotazione_in_confermata() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    -- Se lo stato è ancora "in attesa" e viene inserito un metodo di pagamento, cambia il valore in "confermata"
+    IF NEW.stato = 'IN_ATTESA' AND NEW.id_metodo_pagamento IS NOT NULL THEN
+        NEW.stato := 'CONFERMATA';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION public.aggiorna_stato_prenotazione_in_confermata() OWNER TO antoniocannistra;
 
 SET default_tablespace = '';
 
@@ -272,7 +298,7 @@ CREATE TABLE public.prenotazione (
     id_prenotazione integer NOT NULL,
     stato public.stato_prenotazione DEFAULT 'IN_ATTESA'::public.stato_prenotazione NOT NULL,
     data_prenotazione timestamp without time zone DEFAULT now() NOT NULL,
-    prezzo_totale numeric(10,2) NOT NULL,
+    prezzo_totale numeric(10,2) DEFAULT 0.00 NOT NULL,
     id_passeggero integer NOT NULL,
     id_metodo_pagamento integer
 );
@@ -388,7 +414,7 @@ CREATE SEQUENCE public.tratta_id_tratta_seq
 ALTER SEQUENCE public.tratta_id_tratta_seq OWNER TO antoniocannistra;
 
 --
--- TOC entry 3793 (class 0 OID 0)
+-- TOC entry 3797 (class 0 OID 0)
 -- Dependencies: 226
 -- Name: tratta_id_tratta_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: antoniocannistra
 --
@@ -433,7 +459,7 @@ CREATE MATERIALIZED VIEW public.tratte_giornaliere AS
 ALTER MATERIALIZED VIEW public.tratte_giornaliere OWNER TO antoniocannistra;
 
 --
--- TOC entry 3574 (class 2604 OID 16476)
+-- TOC entry 3576 (class 2604 OID 16476)
 -- Name: tratta id_tratta; Type: DEFAULT; Schema: public; Owner: antoniocannistra
 --
 
@@ -441,7 +467,7 @@ ALTER TABLE ONLY public.tratta ALTER COLUMN id_tratta SET DEFAULT nextval('publi
 
 
 --
--- TOC entry 3769 (class 0 OID 16431)
+-- TOC entry 3774 (class 0 OID 16431)
 -- Dependencies: 220
 -- Data for Name: biglietto; Type: TABLE DATA; Schema: public; Owner: antoniocannistra
 --
@@ -450,10 +476,12 @@ INSERT INTO public.biglietto OVERRIDING SYSTEM VALUE VALUES (22, '2025-04-22 13:
 INSERT INTO public.biglietto OVERRIDING SYSTEM VALUE VALUES (23, '2025-04-28 14:37:29.235573', NULL, NULL, '2025-04-28 17:00:50', 2, 1, 5, 6.00);
 INSERT INTO public.biglietto OVERRIDING SYSTEM VALUE VALUES (25, '2025-04-28 14:38:30.018475', NULL, NULL, '2025-04-28 17:00:53', 2, 1, 7, 20.00);
 INSERT INTO public.biglietto OVERRIDING SYSTEM VALUE VALUES (26, '2025-04-28 15:30:46.240773', NULL, NULL, NULL, 4, 1, 5, 6.00);
+INSERT INTO public.biglietto OVERRIDING SYSTEM VALUE VALUES (27, '2025-04-29 13:58:07.442983', NULL, NULL, NULL, 7, 1, 5, 6.00);
+INSERT INTO public.biglietto OVERRIDING SYSTEM VALUE VALUES (28, '2025-04-29 14:00:55.202007', NULL, NULL, NULL, 7, 1, 7, 20.00);
 
 
 --
--- TOC entry 3778 (class 0 OID 16490)
+-- TOC entry 3783 (class 0 OID 16490)
 -- Dependencies: 229
 -- Data for Name: effettua; Type: TABLE DATA; Schema: public; Owner: antoniocannistra
 --
@@ -467,7 +495,7 @@ INSERT INTO public.effettua OVERRIDING SYSTEM VALUE VALUES (8, '2025-04-28 17:32
 
 
 --
--- TOC entry 3785 (class 0 OID 24680)
+-- TOC entry 3790 (class 0 OID 24680)
 -- Dependencies: 236
 -- Data for Name: fermate; Type: TABLE DATA; Schema: public; Owner: antoniocannistra
 --
@@ -478,7 +506,7 @@ INSERT INTO public.fermate OVERRIDING SYSTEM VALUE VALUES (5, 4, 20, 5, '2025-04
 
 
 --
--- TOC entry 3781 (class 0 OID 24604)
+-- TOC entry 3786 (class 0 OID 24604)
 -- Dependencies: 232
 -- Data for Name: metodo_pagamento; Type: TABLE DATA; Schema: public; Owner: antoniocannistra
 --
@@ -489,7 +517,7 @@ INSERT INTO public.metodo_pagamento OVERRIDING SYSTEM VALUE VALUES (2, 'Carta di
 
 
 --
--- TOC entry 3767 (class 0 OID 16410)
+-- TOC entry 3772 (class 0 OID 16410)
 -- Dependencies: 218
 -- Data for Name: passeggero; Type: TABLE DATA; Schema: public; Owner: antoniocannistra
 --
@@ -509,18 +537,19 @@ INSERT INTO public.passeggero OVERRIDING SYSTEM VALUE VALUES (3, 'Mario', 'Bianc
 
 
 --
--- TOC entry 3783 (class 0 OID 24622)
+-- TOC entry 3788 (class 0 OID 24622)
 -- Dependencies: 234
 -- Data for Name: prenotazione; Type: TABLE DATA; Schema: public; Owner: antoniocannistra
 --
 
 INSERT INTO public.prenotazione OVERRIDING SYSTEM VALUE VALUES (1, 'IN_ATTESA', '2025-04-22 09:52:27.982121', 30.00, 1, 1);
 INSERT INTO public.prenotazione OVERRIDING SYSTEM VALUE VALUES (2, 'CONFERMATA', '2025-04-28 16:31:25', 26.00, 1, 1);
-INSERT INTO public.prenotazione OVERRIDING SYSTEM VALUE VALUES (4, 'IN_ATTESA', '2025-04-28 15:30:13.384903', 6.00, 3, NULL);
+INSERT INTO public.prenotazione OVERRIDING SYSTEM VALUE VALUES (4, 'CONFERMATA', '2025-04-28 15:30:13.384903', 6.00, 3, 3);
+INSERT INTO public.prenotazione OVERRIDING SYSTEM VALUE VALUES (7, 'CONFERMATA', '2025-04-29 13:57:16.727806', 26.00, 4, 1);
 
 
 --
--- TOC entry 3774 (class 0 OID 16467)
+-- TOC entry 3779 (class 0 OID 16467)
 -- Dependencies: 225
 -- Data for Name: stazione; Type: TABLE DATA; Schema: public; Owner: antoniocannistra
 --
@@ -550,7 +579,7 @@ INSERT INTO public.stazione OVERRIDING SYSTEM VALUE VALUES (22, 'Villa S. Giovan
 
 
 --
--- TOC entry 3771 (class 0 OID 16443)
+-- TOC entry 3776 (class 0 OID 16443)
 -- Dependencies: 222
 -- Data for Name: tipologia_biglietto; Type: TABLE DATA; Schema: public; Owner: antoniocannistra
 --
@@ -562,7 +591,7 @@ INSERT INTO public.tipologia_biglietto OVERRIDING SYSTEM VALUE VALUES (4, 'ABBON
 
 
 --
--- TOC entry 3776 (class 0 OID 16473)
+-- TOC entry 3781 (class 0 OID 16473)
 -- Dependencies: 227
 -- Data for Name: tratta; Type: TABLE DATA; Schema: public; Owner: antoniocannistra
 --
@@ -576,7 +605,7 @@ INSERT INTO public.tratta VALUES (5, 40.00, 21, 12, 35, 'MIME35');
 
 
 --
--- TOC entry 3772 (class 0 OID 16461)
+-- TOC entry 3777 (class 0 OID 16461)
 -- Dependencies: 223
 -- Data for Name: treno; Type: TABLE DATA; Schema: public; Owner: antoniocannistra
 --
@@ -586,16 +615,16 @@ INSERT INTO public.treno VALUES (100291, 'BUSINESS', 300);
 
 
 --
--- TOC entry 3794 (class 0 OID 0)
+-- TOC entry 3798 (class 0 OID 0)
 -- Dependencies: 219
 -- Name: biglietto_id_biglietto_seq; Type: SEQUENCE SET; Schema: public; Owner: antoniocannistra
 --
 
-SELECT pg_catalog.setval('public.biglietto_id_biglietto_seq', 26, true);
+SELECT pg_catalog.setval('public.biglietto_id_biglietto_seq', 28, true);
 
 
 --
--- TOC entry 3795 (class 0 OID 0)
+-- TOC entry 3799 (class 0 OID 0)
 -- Dependencies: 228
 -- Name: effettua_id_effettua_seq; Type: SEQUENCE SET; Schema: public; Owner: antoniocannistra
 --
@@ -604,7 +633,7 @@ SELECT pg_catalog.setval('public.effettua_id_effettua_seq', 9, true);
 
 
 --
--- TOC entry 3796 (class 0 OID 0)
+-- TOC entry 3800 (class 0 OID 0)
 -- Dependencies: 235
 -- Name: fermate_id_fermata_seq; Type: SEQUENCE SET; Schema: public; Owner: antoniocannistra
 --
@@ -613,7 +642,7 @@ SELECT pg_catalog.setval('public.fermate_id_fermata_seq', 5, true);
 
 
 --
--- TOC entry 3797 (class 0 OID 0)
+-- TOC entry 3801 (class 0 OID 0)
 -- Dependencies: 231
 -- Name: metodo_pagamento_id_metodo_pagamento_seq; Type: SEQUENCE SET; Schema: public; Owner: antoniocannistra
 --
@@ -622,7 +651,7 @@ SELECT pg_catalog.setval('public.metodo_pagamento_id_metodo_pagamento_seq', 3, t
 
 
 --
--- TOC entry 3798 (class 0 OID 0)
+-- TOC entry 3802 (class 0 OID 0)
 -- Dependencies: 217
 -- Name: passeggero_id_passeggero_seq; Type: SEQUENCE SET; Schema: public; Owner: antoniocannistra
 --
@@ -631,16 +660,16 @@ SELECT pg_catalog.setval('public.passeggero_id_passeggero_seq', 13, true);
 
 
 --
--- TOC entry 3799 (class 0 OID 0)
+-- TOC entry 3803 (class 0 OID 0)
 -- Dependencies: 233
 -- Name: prenotazione_id_prenotazione_seq; Type: SEQUENCE SET; Schema: public; Owner: antoniocannistra
 --
 
-SELECT pg_catalog.setval('public.prenotazione_id_prenotazione_seq', 5, true);
+SELECT pg_catalog.setval('public.prenotazione_id_prenotazione_seq', 7, true);
 
 
 --
--- TOC entry 3800 (class 0 OID 0)
+-- TOC entry 3804 (class 0 OID 0)
 -- Dependencies: 224
 -- Name: stazione_id_stazione_seq; Type: SEQUENCE SET; Schema: public; Owner: antoniocannistra
 --
@@ -649,7 +678,7 @@ SELECT pg_catalog.setval('public.stazione_id_stazione_seq', 22, true);
 
 
 --
--- TOC entry 3801 (class 0 OID 0)
+-- TOC entry 3805 (class 0 OID 0)
 -- Dependencies: 221
 -- Name: tipologia_biglietto_id_tipologia_seq; Type: SEQUENCE SET; Schema: public; Owner: antoniocannistra
 --
@@ -658,7 +687,7 @@ SELECT pg_catalog.setval('public.tipologia_biglietto_id_tipologia_seq', 4, true)
 
 
 --
--- TOC entry 3802 (class 0 OID 0)
+-- TOC entry 3806 (class 0 OID 0)
 -- Dependencies: 226
 -- Name: tratta_id_tratta_seq; Type: SEQUENCE SET; Schema: public; Owner: antoniocannistra
 --
@@ -667,7 +696,7 @@ SELECT pg_catalog.setval('public.tratta_id_tratta_seq', 7, true);
 
 
 --
--- TOC entry 3587 (class 2606 OID 16436)
+-- TOC entry 3590 (class 2606 OID 16436)
 -- Name: biglietto biglietto_pkey; Type: CONSTRAINT; Schema: public; Owner: antoniocannistra
 --
 
@@ -676,7 +705,7 @@ ALTER TABLE ONLY public.biglietto
 
 
 --
--- TOC entry 3578 (class 2606 OID 16550)
+-- TOC entry 3581 (class 2606 OID 16550)
 -- Name: passeggero cf_unique; Type: CONSTRAINT; Schema: public; Owner: antoniocannistra
 --
 
@@ -685,7 +714,7 @@ ALTER TABLE ONLY public.passeggero
 
 
 --
--- TOC entry 3601 (class 2606 OID 16494)
+-- TOC entry 3604 (class 2606 OID 16494)
 -- Name: effettua effettua_pkey; Type: CONSTRAINT; Schema: public; Owner: antoniocannistra
 --
 
@@ -694,7 +723,7 @@ ALTER TABLE ONLY public.effettua
 
 
 --
--- TOC entry 3608 (class 2606 OID 24684)
+-- TOC entry 3611 (class 2606 OID 24684)
 -- Name: fermate fermate_pkey; Type: CONSTRAINT; Schema: public; Owner: antoniocannistra
 --
 
@@ -703,7 +732,7 @@ ALTER TABLE ONLY public.fermate
 
 
 --
--- TOC entry 3604 (class 2606 OID 24608)
+-- TOC entry 3607 (class 2606 OID 24608)
 -- Name: metodo_pagamento metodo_pagamento_pkey; Type: CONSTRAINT; Schema: public; Owner: antoniocannistra
 --
 
@@ -712,7 +741,7 @@ ALTER TABLE ONLY public.metodo_pagamento
 
 
 --
--- TOC entry 3581 (class 2606 OID 16414)
+-- TOC entry 3584 (class 2606 OID 16414)
 -- Name: passeggero passeggero_pkey; Type: CONSTRAINT; Schema: public; Owner: antoniocannistra
 --
 
@@ -721,7 +750,7 @@ ALTER TABLE ONLY public.passeggero
 
 
 --
--- TOC entry 3583 (class 2606 OID 16416)
+-- TOC entry 3586 (class 2606 OID 16416)
 -- Name: passeggero passeggero_tessera_key; Type: CONSTRAINT; Schema: public; Owner: antoniocannistra
 --
 
@@ -730,7 +759,7 @@ ALTER TABLE ONLY public.passeggero
 
 
 --
--- TOC entry 3606 (class 2606 OID 24628)
+-- TOC entry 3609 (class 2606 OID 24628)
 -- Name: prenotazione prenotazione_pkey; Type: CONSTRAINT; Schema: public; Owner: antoniocannistra
 --
 
@@ -739,7 +768,7 @@ ALTER TABLE ONLY public.prenotazione
 
 
 --
--- TOC entry 3594 (class 2606 OID 16471)
+-- TOC entry 3597 (class 2606 OID 16471)
 -- Name: stazione stazione_pkey; Type: CONSTRAINT; Schema: public; Owner: antoniocannistra
 --
 
@@ -748,7 +777,7 @@ ALTER TABLE ONLY public.stazione
 
 
 --
--- TOC entry 3589 (class 2606 OID 16447)
+-- TOC entry 3592 (class 2606 OID 16447)
 -- Name: tipologia_biglietto tipologia_biglietto_pkey; Type: CONSTRAINT; Schema: public; Owner: antoniocannistra
 --
 
@@ -757,7 +786,7 @@ ALTER TABLE ONLY public.tipologia_biglietto
 
 
 --
--- TOC entry 3597 (class 2606 OID 16478)
+-- TOC entry 3600 (class 2606 OID 16478)
 -- Name: tratta tratta_pkey; Type: CONSTRAINT; Schema: public; Owner: antoniocannistra
 --
 
@@ -766,7 +795,7 @@ ALTER TABLE ONLY public.tratta
 
 
 --
--- TOC entry 3591 (class 2606 OID 16465)
+-- TOC entry 3594 (class 2606 OID 16465)
 -- Name: treno treno_pkey; Type: CONSTRAINT; Schema: public; Owner: antoniocannistra
 --
 
@@ -775,7 +804,7 @@ ALTER TABLE ONLY public.treno
 
 
 --
--- TOC entry 3599 (class 2606 OID 24718)
+-- TOC entry 3602 (class 2606 OID 24718)
 -- Name: tratta unique_cod_tratta; Type: CONSTRAINT; Schema: public; Owner: antoniocannistra
 --
 
@@ -784,7 +813,7 @@ ALTER TABLE ONLY public.tratta
 
 
 --
--- TOC entry 3585 (class 2606 OID 24579)
+-- TOC entry 3588 (class 2606 OID 24579)
 -- Name: passeggero unique_piva; Type: CONSTRAINT; Schema: public; Owner: antoniocannistra
 --
 
@@ -793,7 +822,7 @@ ALTER TABLE ONLY public.passeggero
 
 
 --
--- TOC entry 3602 (class 1259 OID 24594)
+-- TOC entry 3605 (class 1259 OID 24594)
 -- Name: idx_effettua_partenza_prevista; Type: INDEX; Schema: public; Owner: antoniocannistra
 --
 
@@ -801,7 +830,7 @@ CREATE INDEX idx_effettua_partenza_prevista ON public.effettua USING btree (part
 
 
 --
--- TOC entry 3579 (class 1259 OID 24592)
+-- TOC entry 3582 (class 1259 OID 24592)
 -- Name: idx_passeggero_nome_cognome; Type: INDEX; Schema: public; Owner: antoniocannistra
 --
 
@@ -809,7 +838,7 @@ CREATE INDEX idx_passeggero_nome_cognome ON public.passeggero USING btree (nome,
 
 
 --
--- TOC entry 3592 (class 1259 OID 24593)
+-- TOC entry 3595 (class 1259 OID 24593)
 -- Name: idx_stazione_nome; Type: INDEX; Schema: public; Owner: antoniocannistra
 --
 
@@ -817,7 +846,7 @@ CREATE INDEX idx_stazione_nome ON public.stazione USING btree (nome);
 
 
 --
--- TOC entry 3595 (class 1259 OID 24719)
+-- TOC entry 3598 (class 1259 OID 24719)
 -- Name: idx_tratta_cod_tratta; Type: INDEX; Schema: public; Owner: antoniocannistra
 --
 
@@ -825,7 +854,23 @@ CREATE INDEX idx_tratta_cod_tratta ON public.tratta USING btree (cod_tratta);
 
 
 --
--- TOC entry 3609 (class 2606 OID 24695)
+-- TOC entry 3623 (class 2620 OID 24723)
+-- Name: biglietto trigger_aggiorna_prezzo_totale; Type: TRIGGER; Schema: public; Owner: antoniocannistra
+--
+
+CREATE TRIGGER trigger_aggiorna_prezzo_totale AFTER INSERT OR DELETE OR UPDATE ON public.biglietto FOR EACH ROW EXECUTE FUNCTION public.aggiorna_prezzo_totale();
+
+
+--
+-- TOC entry 3624 (class 2620 OID 24721)
+-- Name: prenotazione trigger_stato_confermata; Type: TRIGGER; Schema: public; Owner: antoniocannistra
+--
+
+CREATE TRIGGER trigger_stato_confermata BEFORE UPDATE ON public.prenotazione FOR EACH ROW EXECUTE FUNCTION public.aggiorna_stato_prenotazione_in_confermata();
+
+
+--
+-- TOC entry 3612 (class 2606 OID 24695)
 -- Name: biglietto biglietto_tratta_fk; Type: FK CONSTRAINT; Schema: public; Owner: antoniocannistra
 --
 
@@ -834,7 +879,7 @@ ALTER TABLE ONLY public.biglietto
 
 
 --
--- TOC entry 3614 (class 2606 OID 16495)
+-- TOC entry 3617 (class 2606 OID 16495)
 -- Name: effettua effettua_id_tratta_fkey; Type: FK CONSTRAINT; Schema: public; Owner: antoniocannistra
 --
 
@@ -843,7 +888,7 @@ ALTER TABLE ONLY public.effettua
 
 
 --
--- TOC entry 3615 (class 2606 OID 16500)
+-- TOC entry 3618 (class 2606 OID 16500)
 -- Name: effettua effettua_id_treno_fkey; Type: FK CONSTRAINT; Schema: public; Owner: antoniocannistra
 --
 
@@ -852,7 +897,7 @@ ALTER TABLE ONLY public.effettua
 
 
 --
--- TOC entry 3618 (class 2606 OID 24685)
+-- TOC entry 3621 (class 2606 OID 24685)
 -- Name: fermate fermate_id_tratta_fkey; Type: FK CONSTRAINT; Schema: public; Owner: antoniocannistra
 --
 
@@ -861,7 +906,7 @@ ALTER TABLE ONLY public.fermate
 
 
 --
--- TOC entry 3619 (class 2606 OID 24690)
+-- TOC entry 3622 (class 2606 OID 24690)
 -- Name: fermate fermate_stazione_fkey; Type: FK CONSTRAINT; Schema: public; Owner: antoniocannistra
 --
 
@@ -870,7 +915,7 @@ ALTER TABLE ONLY public.fermate
 
 
 --
--- TOC entry 3610 (class 2606 OID 24649)
+-- TOC entry 3613 (class 2606 OID 24649)
 -- Name: biglietto fk_biglietto_prenotazione; Type: FK CONSTRAINT; Schema: public; Owner: antoniocannistra
 --
 
@@ -879,7 +924,7 @@ ALTER TABLE ONLY public.biglietto
 
 
 --
--- TOC entry 3611 (class 2606 OID 24669)
+-- TOC entry 3614 (class 2606 OID 24669)
 -- Name: biglietto fk_biglietto_tipologia; Type: FK CONSTRAINT; Schema: public; Owner: antoniocannistra
 --
 
@@ -888,7 +933,7 @@ ALTER TABLE ONLY public.biglietto
 
 
 --
--- TOC entry 3616 (class 2606 OID 24674)
+-- TOC entry 3619 (class 2606 OID 24674)
 -- Name: prenotazione fk_prenotazione_pagamento; Type: FK CONSTRAINT; Schema: public; Owner: antoniocannistra
 --
 
@@ -897,7 +942,7 @@ ALTER TABLE ONLY public.prenotazione
 
 
 --
--- TOC entry 3617 (class 2606 OID 24629)
+-- TOC entry 3620 (class 2606 OID 24629)
 -- Name: prenotazione prenotazione_id_passeggero_fkey; Type: FK CONSTRAINT; Schema: public; Owner: antoniocannistra
 --
 
@@ -906,7 +951,7 @@ ALTER TABLE ONLY public.prenotazione
 
 
 --
--- TOC entry 3612 (class 2606 OID 16484)
+-- TOC entry 3615 (class 2606 OID 16484)
 -- Name: tratta tratta_id_stazione_arrivo_fkey; Type: FK CONSTRAINT; Schema: public; Owner: antoniocannistra
 --
 
@@ -915,7 +960,7 @@ ALTER TABLE ONLY public.tratta
 
 
 --
--- TOC entry 3613 (class 2606 OID 16479)
+-- TOC entry 3616 (class 2606 OID 16479)
 -- Name: tratta tratta_id_stazione_partenza_fkey; Type: FK CONSTRAINT; Schema: public; Owner: antoniocannistra
 --
 
@@ -924,15 +969,15 @@ ALTER TABLE ONLY public.tratta
 
 
 --
--- TOC entry 3779 (class 0 OID 24580)
--- Dependencies: 230 3787
+-- TOC entry 3784 (class 0 OID 24580)
+-- Dependencies: 230 3792
 -- Name: tratte_giornaliere; Type: MATERIALIZED VIEW DATA; Schema: public; Owner: antoniocannistra
 --
 
 REFRESH MATERIALIZED VIEW public.tratte_giornaliere;
 
 
--- Completed on 2025-04-29 11:52:50 CEST
+-- Completed on 2025-04-30 10:36:47 CEST
 
 --
 -- PostgreSQL database dump complete
